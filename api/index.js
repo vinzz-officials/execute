@@ -1,5 +1,23 @@
 import fetch from "node-fetch";
 
+// =============================
+// ✅ FETCH DENGAN TIMEOUT 10 DETIK
+// =============================
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export default async function handler(req, res) {
   try {
     const host = req.headers.host;
@@ -12,7 +30,6 @@ export default async function handler(req, res) {
     if (path.startsWith("/api/webhook/")) {
       const BOT_TOKEN = path.replace("/api/webhook/", "").trim();
 
-      // ✅ pastikan body sudah JSON
       const update = typeof req.body === "string"
         ? JSON.parse(req.body)
         : req.body;
@@ -39,22 +56,22 @@ export default async function handler(req, res) {
       }
 
       // ======================
-      // ✅ /get
+      // ✅ /get (TIMEOUT AKTIF)
       // ======================
       if (text.startsWith("/get ")) {
         const target = text.slice(5);
         try {
-          const resp = await fetch(target);
+          const resp = await fetchWithTimeout(target, {}, 10000);
           const out = await resp.text();
           await send(chat_id, out, BOT_TOKEN);
         } catch (e) {
-          await send(chat_id, "ERROR GET: " + e.toString(), BOT_TOKEN);
+          await send(chat_id, "ERROR GET (TIMEOUT): " + e.toString(), BOT_TOKEN);
         }
         return res.json({ ok: true });
       }
 
       // ======================
-      // ✅ /post
+      // ✅ /post (TIMEOUT AKTIF)
       // ======================
       if (text.startsWith("/post ")) {
         try {
@@ -65,16 +82,16 @@ export default async function handler(req, res) {
           const target = content.substring(0, space);
           const jsonTxt = content.substring(space + 1);
 
-          const resp = await fetch(target, {
+          const resp = await fetchWithTimeout(target, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(JSON.parse(jsonTxt))
-          });
+          }, 10000);
 
           const out = await resp.text();
           await send(chat_id, out, BOT_TOKEN);
         } catch (e) {
-          await send(chat_id, "ERROR POST: " + e.toString(), BOT_TOKEN);
+          await send(chat_id, "ERROR POST (TIMEOUT): " + e.toString(), BOT_TOKEN);
         }
         return res.json({ ok: true });
       }
@@ -87,7 +104,7 @@ export default async function handler(req, res) {
     // ✅ API REST MODE
     // ======================================
 
-    // ✅ /api/run  (POST)
+    // ✅ /api/run (POST)
     if (path === "/api/run" && req.method === "POST") {
       const body = typeof req.body === "string"
         ? JSON.parse(req.body)
@@ -104,22 +121,21 @@ export default async function handler(req, res) {
       }
     }
 
-    // ✅ /api/get?url=xxxx
+    // ✅ /api/get?url=xxxx (TIMEOUT AKTIF)
     if (path === "/api/get" && req.method === "GET") {
       const target = fullUrl.searchParams.get("url");
       if (!target) return res.json({ error: "Missing url" });
 
       try {
-        const resp = await fetch(target);
+        const resp = await fetchWithTimeout(target, {}, 10000);
         const out = await resp.text();
         return res.send(out);
       } catch (e) {
-        return res.json({ error: e.toString() });
+        return res.json({ error: "TIMEOUT / BLOCK: " + e.toString() });
       }
     }
 
-    // ✅ /api/post (POST BODY)
-    // ✅ /api/post?url=xxx&data={}
+    // ✅ /api/post (POST + GET MODE) (TIMEOUT AKTIF)
     if (path === "/api/post") {
       let target, bodyData;
 
@@ -141,16 +157,16 @@ export default async function handler(req, res) {
       }
 
       try {
-        const resp = await fetch(target, {
+        const resp = await fetchWithTimeout(target, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(bodyData),
-        });
+        }, 10000);
 
         const out = await resp.text();
         return res.send(out);
       } catch (e) {
-        return res.json({ error: e.toString() });
+        return res.json({ error: "TIMEOUT / BLOCK: " + e.toString() });
       }
     }
 
@@ -171,11 +187,11 @@ export default async function handler(req, res) {
 }
 
 // ======================================
-// ✅ FUNCTION SEND TELEGRAM
+// ✅ FUNCTION SEND TELEGRAM (PAKAI TIMEOUT JUGA)
 // ======================================
 async function send(chat, msg, token) {
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    await fetchWithTimeout(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -183,8 +199,8 @@ async function send(chat, msg, token) {
         text: msg,
         disable_web_page_preview: true
       })
-    });
+    }, 10000);
   } catch (e) {
-    console.error("ERROR SEND TELEGRAM:", e.toString());
+    console.error("ERROR SEND TELEGRAM (TIMEOUT):", e.toString());
   }
 }
