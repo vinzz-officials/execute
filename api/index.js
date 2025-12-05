@@ -55,20 +55,37 @@ export default async function handler(req, res) {
         return res.json({ ok: true });
       }
 
-      // ======================
-      // ✅ /get (TIMEOUT AKTIF)
-      // ======================
-      if (text.startsWith("/get ")) {
-        const target = text.slice(5);
-        try {
-          const resp = await fetchWithTimeout(target, {}, 10000);
-          const out = await resp.text();
-          await send(chat_id, out, BOT_TOKEN);
-        } catch (e) {
-          await send(chat_id, "ERROR GET (TIMEOUT): " + e.toString(), BOT_TOKEN);
-        }
-        return res.json({ ok: true });
+// ======================
+// ✅ /get (SUPPORT COOKIE)
+// ======================
+if (text.startsWith("/get ")) {
+  const raw = text.slice(5);
+  let target, cookie;
+
+  if (raw.includes("|")) {
+    const split = raw.split("|");
+    target = split[0].trim();
+    cookie = split[1].trim();
+  } else {
+    target = raw.trim();
+  }
+
+  try {
+    const resp = await fetch(target, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        ...(cookie ? { "Cookie": cookie } : {})
       }
+    });
+
+    const out = await resp.text();
+    await send(chat_id, out.slice(0, 4000), BOT_TOKEN); // aman limit TG
+  } catch (e) {
+    await send(chat_id, "ERROR GET: " + e.toString(), BOT_TOKEN);
+  }
+
+  return res.json({ ok: true });
+}
 
       // ======================
       // ✅ /post (TIMEOUT AKTIF)
@@ -121,19 +138,27 @@ export default async function handler(req, res) {
       }
     }
 
-    // ✅ /api/get?url=xxxx (TIMEOUT AKTIF)
-    if (path === "/api/get" && req.method === "GET") {
-      const target = fullUrl.searchParams.get("url");
-      if (!target) return res.json({ error: "Missing url" });
+    // ✅ /api/get?url=xxxx&cookie=abcd
+if (path === "/api/get" && req.method === "GET") {
+  const target = fullUrl.searchParams.get("url");
+  const cookie = fullUrl.searchParams.get("cookie");
 
-      try {
-        const resp = await fetchWithTimeout(target, {}, 10000);
-        const out = await resp.text();
-        return res.send(out);
-      } catch (e) {
-        return res.json({ error: "TIMEOUT / BLOCK: " + e.toString() });
+  if (!target) return res.json({ error: "Missing url" });
+
+  try {
+    const resp = await fetch(target, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        ...(cookie ? { "Cookie": cookie } : {})
       }
-    }
+    });
+
+    const out = await resp.text();
+    return res.send(out);
+  } catch (e) {
+    return res.json({ error: e.toString() });
+  }
+}
 
     // ✅ /api/post (POST + GET MODE) (TIMEOUT AKTIF)
     if (path === "/api/post") {
