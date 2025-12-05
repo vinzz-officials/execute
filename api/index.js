@@ -56,18 +56,17 @@ export default async function handler(req, res) {
       }
 
 // ======================
-// ✅ /get (SUPPORT COOKIE)
+// ✅ /get (AUTO FILE JIKA KEPANJANGAN)
 // ======================
 if (text.startsWith("/get ")) {
   const raw = text.slice(5);
-  let target, cookie;
+  let target = raw.trim();
+  let cookie = null;
 
   if (raw.includes("|")) {
     const split = raw.split("|");
     target = split[0].trim();
     cookie = split[1].trim();
-  } else {
-    target = raw.trim();
   }
 
   try {
@@ -79,7 +78,26 @@ if (text.startsWith("/get ")) {
     });
 
     const out = await resp.text();
-    await send(chat_id, out.slice(0, 4000), BOT_TOKEN); // aman limit TG
+
+    // ✅ JIKA KEPANJANGAN → KIRIM FILE
+    if (out.length > 4000) {
+      const filename = `result_${Date.now()}.txt`;
+
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id,
+          filename,
+          caption: "✅ Output terlalu panjang, dikirim sebagai file.",
+          document: Buffer.from(out).toString("base64")
+        })
+      });
+
+    } else {
+      await send(chat_id, out, BOT_TOKEN);
+    }
+
   } catch (e) {
     await send(chat_id, "ERROR GET: " + e.toString(), BOT_TOKEN);
   }
