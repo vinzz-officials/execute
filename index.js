@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const path = url.pathname;
 
   // ==========================
-  // ROUTE /api/webhook/:token
+  // WEBHOOK /api/webhook/:token
   // ==========================
   if (path.startsWith("/api/webhook/")) {
     const BOT_TOKEN = path.replace("/api/webhook/", "").trim();
@@ -16,15 +16,11 @@ export default async function handler(req, res) {
     const chat_id = update.message.chat.id;
     const text = update.message.text.trim();
 
-    // ==========================
-    // COMMAND HANDLER
-    // ==========================
+    // COMMANDS
     if (text.startsWith("/run ")) {
       const code = text.slice(5);
       try {
-        let result;
-        // langsung eval (hati-hati)
-        result = eval(code); 
+        let result = eval(code); 
         await send(chat_id, "OUTPUT:\n" + String(result), BOT_TOKEN);
       } catch (e) {
         await send(chat_id, "ERROR RUN: " + e.toString(), BOT_TOKEN);
@@ -69,7 +65,49 @@ export default async function handler(req, res) {
   }
 
   // ==========================
-  // DEFAULT ROOT / atau route lain
+  // ROUTE LANGSUNG /api/run, /api/get, /api/post
+  // ==========================
+  if (path.startsWith("/api/run") && req.method === "POST") {
+    const { code } = req.body || {};
+    if (!code) return res.json({ error: "Missing code" });
+    try {
+      const result = eval(code);
+      return res.json({ output: String(result) });
+    } catch (e) {
+      return res.json({ error: e.toString() });
+    }
+  }
+
+  if (path.startsWith("/api/get") && req.method === "GET") {
+    const target = req.searchParams.get("url");
+    if (!target) return res.json({ error: "Missing url" });
+    try {
+      const resp = await fetch(target);
+      const out = await resp.text();
+      return res.send(out);
+    } catch (e) {
+      return res.json({ error: e.toString() });
+    }
+  }
+
+  if (path.startsWith("/api/post") && req.method === "POST") {
+    const { url: target, body } = req.body || {};
+    if (!target || !body) return res.json({ error: "Missing url or body" });
+    try {
+      const resp = await fetch(target, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const out = await resp.text();
+      return res.send(out);
+    } catch (e) {
+      return res.json({ error: e.toString() });
+    }
+  }
+
+  // ==========================
+  // ROOT / fallback
   // ==========================
   return res.json({ ok: true, info: "Server aktif. Gunakan /api/webhook/<token>" });
 }
