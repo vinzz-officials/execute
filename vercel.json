@@ -1,7 +1,7 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/api/webhook/(.*)", "dest": "index.js" },
+    { "src": "/webhook/(.*)", "dest": "index.js" },
     { "src": "/api/run", "dest": "index.js" },
     { "src": "/api/get", "dest": "index.js" },
     { "src": "/api/post", "dest": "index.js" },
