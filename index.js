@@ -83,8 +83,6 @@ export default async function handler(req, res) {
     return res.json({ ok: true });
   }
 
-  // Default response untuk route lain
-  return res.json({ ok: true, info: "Webhook aktif. Gunakan /api/webhook/<token>" });
 }
 
 // ==========================
