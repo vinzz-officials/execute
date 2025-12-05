@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-
+import FormData from "form-data";
 // =============================
 // ✅ FETCH DENGAN TIMEOUT 10 DETIK
 // =============================
@@ -56,7 +56,8 @@ export default async function handler(req, res) {
       }
 
 // ======================
-// ✅ /get (AUTO FILE JIKA KEPANJANGAN)
+// ======================
+// ✅ /get (AUTO FILE JIKA KEPANJANGAN - FIXED)
 // ======================
 if (text.startsWith("/get ")) {
   const raw = text.slice(5);
@@ -79,19 +80,21 @@ if (text.startsWith("/get ")) {
 
     const out = await resp.text();
 
-    // ✅ JIKA KEPANJANGAN → KIRIM FILE
-    if (out.length > 4000) {
-      const filename = `result_${Date.now()}.txt`;
+    // ✅ JIKA KEPANJANGAN → KIRIM FILE (FIX REAL)
+    if (out.length > 3500) {
+      const form = new FormData();
+      const filename = `get_result_${Date.now()}.txt`;
+
+      form.append("chat_id", chat_id);
+      form.append("caption", "✅ Output kepanjangan, dikirim sebagai file.");
+      form.append("document", Buffer.from(out), {
+        filename,
+        contentType: "text/plain"
+      });
 
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id,
-          filename,
-          caption: "✅ Output terlalu panjang, dikirim sebagai file.",
-          document: Buffer.from(out).toString("base64")
-        })
+        body: form
       });
 
     } else {
@@ -103,8 +106,8 @@ if (text.startsWith("/get ")) {
   }
 
   return res.json({ ok: true });
-}
-
+                      }
+      
       // ======================
       // ✅ /post (TIMEOUT AKTIF)
       // ======================
