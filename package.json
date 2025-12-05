@@ -1,5 +1,12 @@
 {
-  "name": "telegram-webhook-runner",
+  "name": "execution",
   "version": "1.0.0",
-  "type": "module"
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.4.1"
+  }
 }
