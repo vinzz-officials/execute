@@ -108,7 +108,10 @@ if (text.startsWith("/get ")) {
   return res.json({ ok: true });
                       }
       
-      if (text.startsWith("/post ")) {
+      // ======================
+// ✅ /post TELEGRAM COMMAND
+// ======================
+if (text.startsWith("/post ")) {
   try {
     const content = text.slice(6);
     const parts = content.split("|").map(p => p.trim());
@@ -116,8 +119,16 @@ if (text.startsWith("/get ")) {
     const target = parts[0].split(" ")[0]; // ambil URL
     const jsonTxt = parts[0].slice(target.length).trim(); // sisanya JSON
 
-    const headers = { "Content-Type": "application/json" };
+    if (!target) throw new Error("Missing target URL");
+    if (!jsonTxt) throw new Error("Missing JSON body");
 
+    // Safe parse JSON
+    let bodyData;
+    try { bodyData = JSON.parse(jsonTxt); } 
+    catch(e) { throw new Error("Invalid JSON body"); }
+
+    // Build optional headers
+    const headers = { "Content-Type": "application/json" };
     for (let i = 1; i < parts.length; i++) {
       const [key, ...rest] = parts[i].split("=");
       if (!key || rest.length === 0) continue;
@@ -137,8 +148,7 @@ if (text.startsWith("/get ")) {
       }
     }
 
-    const bodyData = JSON.parse(jsonTxt);
-
+    // Fetch POST dengan timeout 10 detik
     const resp = await fetchWithTimeout(target, {
       method: "POST",
       headers,
@@ -147,10 +157,59 @@ if (text.startsWith("/get ")) {
 
     const out = await resp.text();
     await send(chat_id, out, BOT_TOKEN);
+
   } catch (e) {
     await send(chat_id, "ERROR POST: " + e.toString(), BOT_TOKEN);
   }
   return res.json({ ok: true });
+}
+
+// ======================
+// ✅ /api/post (POST BODY atau GET QUERY)
+// ======================
+if (path === "/api/post") {
+  let target, bodyData, headers = { "Content-Type": "application/json" };
+
+  try {
+    if (req.method === "POST") {
+      const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+      target = body?.url;
+      bodyData = body?.body;
+
+      if (body?.sessionUser) headers["Cookie"] = body.sessionUser;
+      if (body?.cookie) headers["Cookie"] = body.cookie;
+      if (body?.auth) headers["Authorization"] = body.auth;
+      if (body?.ua) headers["User-Agent"] = body.ua;
+    } else {
+      target = fullUrl.searchParams.get("url");
+      const raw = fullUrl.searchParams.get("data");
+      bodyData = raw ? JSON.parse(raw) : null;
+
+      const cookie = fullUrl.searchParams.get("cookie");
+      const sessionUser = fullUrl.searchParams.get("sessionUser");
+      const auth = fullUrl.searchParams.get("auth");
+      const ua = fullUrl.searchParams.get("ua");
+
+      if (cookie) headers["Cookie"] = cookie;
+      else if (sessionUser) headers["Cookie"] = sessionUser;
+      if (auth) headers["Authorization"] = auth;
+      if (ua) headers["User-Agent"] = ua;
+    }
+
+    if (!target || !bodyData) return res.json({ error: "Missing url or body" });
+
+    const resp = await fetchWithTimeout(target, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(bodyData),
+    }, 10000);
+
+    const out = await resp.text();
+    return res.send(out);
+
+  } catch (e) {
+    return res.json({ error: "ERROR POST (TIMEOUT/FAIL): " + e.toString() });
+  }
       }
 
     // ======================================
@@ -196,46 +255,6 @@ if (path === "/api/get" && req.method === "GET") {
   }
 }
 
-    if (path === "/api/post") {
-  let target, bodyData, headers = { "Content-Type": "application/json" };
-
-  if (req.method === "POST") {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    target = body?.url;
-    bodyData = body?.body;
-    if (body?.sessionUser) headers["Cookie"] = body.sessionUser;
-    if (body?.cookie) headers["Cookie"] = body.cookie;
-    if (body?.auth) headers["Authorization"] = body.auth;
-    if (body?.ua) headers["User-Agent"] = body.ua;
-  } else {
-    target = fullUrl.searchParams.get("url");
-    const raw = fullUrl.searchParams.get("data");
-    bodyData = raw ? JSON.parse(raw) : null;
-    const cookie = fullUrl.searchParams.get("cookie");
-    const sessionUser = fullUrl.searchParams.get("sessionUser");
-    const auth = fullUrl.searchParams.get("auth");
-    const ua = fullUrl.searchParams.get("ua");
-    if (cookie) headers["Cookie"] = cookie;
-    else if (sessionUser) headers["Cookie"] = sessionUser;
-    if (auth) headers["Authorization"] = auth;
-    if (ua) headers["User-Agent"] = ua;
-  }
-
-  if (!target || !bodyData) return res.json({ error: "Missing url or body" });
-
-  try {
-    const resp = await fetchWithTimeout(target, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(bodyData),
-    }, 10000);
-
-    const out = await resp.text();
-    return res.send(out);
-  } catch (e) {
-    return res.json({ error: "ERROR POST (TIMEOUT/FAIL): " + e.toString() });
-  }
-    }
 
     // ======================================
     // ✅ ROOT
