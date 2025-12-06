@@ -109,34 +109,45 @@ if (text.startsWith("/get ")) {
                       }
       
       // ======================
-      // ✅ /post (TIMEOUT AKTIF)
-      // ======================
-      if (text.startsWith("/post ")) {
-        try {
-          const content = text.slice(6);
-          const space = content.indexOf(" ");
-          if (space === -1) throw new Error("Format: /post <url> <json>");
+// ✅ /post (TIMEOUT + COOKIE SUPPORT FIXED)
+// Format: /post <url> <json> | <cookie>
+// ======================
+if (text.startsWith("/post ")) {
+  try {
+    let content = text.slice(6).trim();
+    let cookie = null;
 
-          const target = content.substring(0, space);
-          const jsonTxt = content.substring(space + 1);
-
-          const resp = await fetchWithTimeout(target, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(JSON.parse(jsonTxt))
-          }, 10000);
-
-          const out = await resp.text();
-          await send(chat_id, out, BOT_TOKEN);
-        } catch (e) {
-          await send(chat_id, "ERROR POST (TIMEOUT): " + e.toString(), BOT_TOKEN);
-        }
-        return res.json({ ok: true });
-      }
-
-      await send(chat_id, "Command tidak dikenal.", BOT_TOKEN);
-      return res.json({ ok: true });
+    // cek ada | di akhir
+    if (content.includes("|")) {
+      const parts = content.split("|");
+      content = parts[0].trim(); // bagian sebelum |
+      cookie = parts[1].trim();  // cookie setelah |
     }
+
+    // pisah url + json
+    const space = content.indexOf(" ");
+    if (space === -1) throw new Error("Format: /post <url> <json> | <cookie>");
+
+    const target = content.substring(0, space).trim();
+    const jsonTxt = content.substring(space + 1).trim();
+
+    const resp = await fetchWithTimeout(target, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookie ? { "Cookie": cookie } : {})
+      },
+      body: JSON.stringify(JSON.parse(jsonTxt))
+    }, 10000);
+
+    const out = await resp.text();
+    await send(chat_id, out, BOT_TOKEN);
+
+  } catch (e) {
+    await send(chat_id, "ERROR POST (TIMEOUT): " + e.toString(), BOT_TOKEN);
+  }
+  return res.json({ ok: true });
+}
 
     // ======================================
     // ✅ API REST MODE
