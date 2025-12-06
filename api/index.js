@@ -125,11 +125,19 @@ if (text.startsWith("/post ")) {
     }
 
     // pisah url + json
-    const space = content.indexOf(" ");
-    if (space === -1) throw new Error("Format: /post <url> <json> | <cookie>");
+    const firstSpace = content.indexOf(" ");
+    if (firstSpace === -1) throw new Error("Format: /post <url> <json> | <cookie>");
 
-    const target = content.substring(0, space).trim();
-    const jsonTxt = content.substring(space + 1).trim();
+    const target = content.substring(0, firstSpace).trim();
+    const jsonTxt = content.substring(firstSpace + 1).trim();
+
+    // parse json aman
+    let bodyData;
+    try {
+      bodyData = JSON.parse(jsonTxt);
+    } catch {
+      throw new Error("JSON invalid: " + jsonTxt);
+    }
 
     const resp = await fetchWithTimeout(target, {
       method: "POST",
@@ -137,18 +145,17 @@ if (text.startsWith("/post ")) {
         "Content-Type": "application/json",
         ...(cookie ? { "Cookie": cookie } : {})
       },
-      body: JSON.stringify(JSON.parse(jsonTxt))
+      body: JSON.stringify(bodyData)
     }, 10000);
 
     const out = await resp.text();
     await send(chat_id, out, BOT_TOKEN);
 
   } catch (e) {
-    await send(chat_id, "ERROR POST (TIMEOUT): " + e.toString(), BOT_TOKEN);
+    await send(chat_id, "ERROR POST: " + e.toString(), BOT_TOKEN);
   }
   return res.json({ ok: true });
 }
-
     // ======================================
     // ✅ API REST MODE
     // ======================================
